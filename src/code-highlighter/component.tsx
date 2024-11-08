@@ -23,14 +23,12 @@ function CodeHighlighter({ pluginUuid: uuid }: CodeHighlighterProps): React.Reac
     chatMessagesToApplyHighlights,
     setChatIdsToApplyHighlights,
   ] = useState<MessageIdAndCodeLanguage[]>([]);
-  const alreadyHighlightedMessages = React.useRef<string[]>([]);
-  const response = pluginApi.useLoadedChatMessages();
+  const responseLoadedChatMessage = pluginApi.useLoadedChatMessages();
 
   useEffect(() => {
-    if (response.data) {
-      const messagesToHighlight = response.data.filter(
-        (message) => message.message.search(CODE_BLOCK_REGEX) !== -1
-            && !alreadyHighlightedMessages.current.includes(message.messageId),
+    if (responseLoadedChatMessage.data) {
+      const messagesToHighlight = responseLoadedChatMessage.data.filter(
+        (message) => message.message.search(CODE_BLOCK_REGEX) !== -1,
       ).map((message) => {
         const codeLanguageIndex = message.message.search(CODE_LANGUAGE_REGEX);
         let codeLanguage = '';
@@ -46,12 +44,7 @@ function CodeHighlighter({ pluginUuid: uuid }: CodeHighlighterProps): React.Reac
       });
       setChatIdsToApplyHighlights(messagesToHighlight);
     }
-  }, [response]);
-
-  useEffect(() => {
-    alreadyHighlightedMessages.current = alreadyHighlightedMessages.current
-      .concat(chatMessagesToApplyHighlights.map((message) => message.messageId));
-  }, [chatMessagesToApplyHighlights]);
+  }, [responseLoadedChatMessage]);
 
   const chatMessagesDomElements = pluginApi.useChatMessageDomElements(chatMessagesToApplyHighlights
     .map((message) => message.messageId));
@@ -65,20 +58,22 @@ function CodeHighlighter({ pluginUuid: uuid }: CodeHighlighterProps): React.Reac
       const codeHTMLTags = chatMessageDomElement.querySelectorAll('code');
 
       codeHTMLTags.forEach((codeTagItem) => {
-        const pre = document.createElement('pre');
-        const code = document.createElement('code');
-        code.classList.add('hljs');
-        code.classList.add(messageFromGraphql.codeLanguage);
-        const pureTextCode = codeTagItem.innerText;
-        const highlightedCode = hljs
-          .highlight(messageFromGraphql.codeLanguage, pureTextCode).value;
-        code.innerHTML = highlightedCode;
-        pre.appendChild(code);
-        codeTagItem.replaceWith(pre);
+        if (!((codeTagItem.parentNode as HTMLElement).tagName === 'PRE')) {
+          const pre = document.createElement('pre');
+          const code = document.createElement('code');
+          code.classList.add('hljs');
+          code.classList.add(messageFromGraphql.codeLanguage);
+          const pureTextCode = codeTagItem.innerText;
+          const highlightedCode = hljs
+            .highlight(messageFromGraphql.codeLanguage, pureTextCode).value;
+          code.innerHTML = highlightedCode;
+          pre.appendChild(code);
+          codeTagItem.replaceWith(pre);
+        }
       });
       return true;
     });
-  }, [response]);
+  }, [chatMessagesToApplyHighlights, chatMessagesDomElements]);
   return null;
 }
 
